@@ -83,8 +83,9 @@ import com.android.photopicker.features.preview.PreviewFeature
 import com.android.photopicker.util.LocalLocalizationHelper
 import kotlinx.coroutines.launch
 
+// CubeOS: tighter, iOS-like spacing around the banner / privacy footnote.
 private val MEASUREMENT_BANNER_PADDING =
-    PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 24.dp)
+    PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp)
 
 // This is the number of rows we should include in the recents section at the top of the Photo Grid.
 // The recents section does not contain any separators.

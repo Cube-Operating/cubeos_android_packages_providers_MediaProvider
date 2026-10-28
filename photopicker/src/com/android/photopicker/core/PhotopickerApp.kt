@@ -23,6 +23,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,7 +36,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -179,8 +182,17 @@ fun PhotopickerAppWithBottomSheet(
     val localConfig = LocalConfiguration.current
     val sheetPeekHeight = remember(localConfig) { (localConfig.screenHeightDp * .75).dp }
 
+    // CubeOS: expose the existing dismiss / confirm callbacks to the iOS-style title bar.
+    val sheetActions =
+        remember(onDismissRequest, onMediaSelectionConfirmed) {
+            PickerSheetActions(onCancel = onDismissRequest, onConfirm = onMediaSelectionConfirmed)
+        }
+
     // Provide the NavController to the rest of the Compose stack.
-    CompositionLocalProvider(LocalNavController provides navController) {
+    CompositionLocalProvider(
+        LocalNavController provides navController,
+        LocalPickerSheetActions provides sheetActions,
+    ) {
         Column(
             modifier =
                 // Apply WindowInsets to this wrapping column to prevent the Bottom Sheet
@@ -194,6 +206,9 @@ fun PhotopickerAppWithBottomSheet(
                 scaffoldState = state,
                 sheetPeekHeight = sheetPeekHeight,
                 sheetContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                // CubeOS: iOS sheet — gentle top corners and a small grabber.
+                sheetShape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                sheetDragHandle = { CubeSheetGrabber() },
                 sheetContentColor = MaterialTheme.colorScheme.onSurface,
                 sheetContent = {
                     Box(
@@ -253,6 +268,20 @@ fun PhotopickerAppWithBottomSheet(
             }
         }
     }
+}
+
+/** CubeOS: the iOS sheet grabber (36x5dp capsule in a tertiary label colour). */
+@Composable
+private fun CubeSheetGrabber() {
+    Box(
+        modifier =
+            Modifier.padding(top = 5.dp, bottom = 3.dp)
+                .size(width = 36.dp, height = 5.dp)
+                .background(
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    RoundedCornerShape(2.5.dp),
+                )
+    )
 }
 
 /**

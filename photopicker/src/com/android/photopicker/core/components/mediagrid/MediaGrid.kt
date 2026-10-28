@@ -25,7 +25,6 @@ import android.provider.MediaStore.Files.FileColumns._SPECIAL_FORMAT_GIF
 import android.provider.MediaStore.Files.FileColumns._SPECIAL_FORMAT_MOTION_PHOTO
 import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -42,7 +41,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +51,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material.icons.filled.MotionPhotosOn
 import androidx.compose.material.icons.filled.PlayCircle
@@ -79,12 +78,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -105,7 +104,6 @@ import com.android.photopicker.core.glide.loadMedia
 import com.android.photopicker.core.theme.CustomAccentColorScheme
 import com.android.photopicker.data.model.Group.Album
 import com.android.photopicker.data.model.Media
-import com.android.photopicker.extensions.circleBackground
 import com.android.photopicker.extensions.insertMonthSeparators
 import com.android.photopicker.extensions.toMediaGridItemFromAlbum
 import com.android.photopicker.extensions.toMediaGridItemFromMedia
@@ -124,11 +122,20 @@ private val CELLS_PER_ROW_EXPANDED: Int = 4
 /** The default (if not overridden) amount of content padding below the grid */
 private val MEASUREMENT_DEFAULT_CONTENT_PADDING = 150.dp
 
-/** The amount of padding to use around each cell in the grid. */
-private val MEASUREMENT_CELL_SPACING = 1.dp
+/** The amount of padding to use around each cell in the grid. (CubeOS: iOS hairline gaps) */
+private val MEASUREMENT_CELL_SPACING = 2.dp
 
-/** The size of the "push in" when an item in the grid is selected */
-private val MEASUREMENT_SELECTED_INTERNAL_PADDING = 12.dp
+/** CubeOS: distance of the iOS selection circle from the bottom/end edges of the tile */
+private val MEASUREMENT_SELECTED_INTERNAL_PADDING = 5.dp
+
+/** CubeOS: diameter of the iOS selection circle */
+private val MEASUREMENT_SELECTION_CIRCLE_SIZE = 22.dp
+
+/** CubeOS: ring width of the iOS selection circle */
+private val MEASUREMENT_SELECTION_RING_WIDTH = 1.5.dp
+
+/** CubeOS: size of the check glyph inside the iOS selection circle */
+private val MEASUREMENT_SELECTION_CHECK_SIZE = 15.dp
 
 /** The distance the mimetype icon is away from the edge */
 private val MEASUREMENT_MIMETYPE_ICON_EDGE_PADDING = 4.dp
@@ -136,26 +143,18 @@ private val MEASUREMENT_MIMETYPE_ICON_EDGE_PADDING = 4.dp
 /** The size of the spacer between the duration text and the mimetype icon */
 private val MEASUREMENT_DURATION_TEXT_SPACER_SIZE = 2.dp
 
-/** The size of the "push in" when an item in the grid is not selected */
-private val MEASUREMENT_NOT_SELECTED_INTERNAL_PADDING = 0.dp
-
 /** The font size of the selected position number */
-private val MEASUREMENT_SELECTED_POSITION_FONT_SIZE = 14.sp
+private val MEASUREMENT_SELECTED_POSITION_FONT_SIZE = 12.sp
 
-/** The offset to apply to the selected icon to shift it over the corner of the image */
-private val MEASUREMENT_SELECTED_ICON_OFFSET = 8.dp
+/** The padding to use around the default separator's content. (CubeOS: iOS section header) */
+private val MEASUREMENT_SEPARATOR_PADDING =
+    PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)
 
-/** Border width for the selected icon */
-private val MEASUREMENT_SELECTED_ICON_BORDER = 2.dp
+/** CubeOS: iOS large section header type */
+private val MEASUREMENT_SEPARATOR_FONT_SIZE = 20.sp
 
-/** The radius to use for the corners of grid cells that are selected */
-private val MEASUREMENT_SELECTED_CORNER_RADIUS = 16.dp
-
-/** The padding to use around the default separator's content. */
-private val MEASUREMENT_SEPARATOR_PADDING = 16.dp
-
-/** The radius to use for the corners of grid cells that are selected */
-val MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS = 16.dp
+/** The radius to use for the corners of album thumbnails (CubeOS: iOS album tile) */
+val MEASUREMENT_SELECTED_CORNER_RADIUS_FOR_ALBUMS = 10.dp
 
 /** The size for the icon used inside the default album thumbnails */
 val MEASUREMENT_DEFAULT_ALBUM_THUMBNAIL_ICON_SIZE = 56.dp
@@ -167,7 +166,7 @@ val MEASUREMENT_DEFAULT_ALBUM_THUMBNAIL_ICON_PADDING = 16.dp
 val MEASUREMENT_DEFAULT_ALBUM_BOTTOM_PADDING = 16.dp
 
 /** Size of the spacer between the album icon and the album display label */
-val MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE = 12.dp
+val MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE = 6.dp
 
 /**
  * Composable for creating a MediaItemGrid from a [PagingData] source of data that implements
@@ -377,26 +376,9 @@ private fun defaultBuildMediaItem(
 ) {
     when (item) {
         is MediaGridItem.MediaItem -> {
-            // Padding is animated based on the selected state of the item. When the item is
-            // selected, it should shrink in the cell and provide a surface background.
-
-
-            val padding by
-                animateDpAsState(
-                    if (isSelected) {
-                        MEASUREMENT_SELECTED_INTERNAL_PADDING
-                    } else {
-                        MEASUREMENT_NOT_SELECTED_INTERNAL_PADDING
-                    }
-                )
-
-            // Modifier for the image itself, which uses the animated padding defined above.
-            val baseModifier = Modifier.fillMaxSize().padding(padding)
-
-            // Additionally, selected items get rounded corners, so that is added to the
-            // baseModifier
-            val selectedModifier =
-                baseModifier.clip(RoundedCornerShape(MEASUREMENT_SELECTED_CORNER_RADIUS))
+            // CubeOS: like the iOS Photos picker, tiles stay square and full size when selected;
+            // selection is shown only by the blue check circle (no per-frame size animation).
+            val baseModifier = Modifier.fillMaxSize()
 
             val mediaDescription = getMediaContentDescription(item.media, dateFormat)
 
@@ -434,11 +416,7 @@ private fun defaultBuildMediaItem(
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 ) {
                     // Container for the image and it's mimetype icon
-                    Box(
-                        // Switch which modifier is getting applied based on if the item is
-                        // selected or not.
-                        modifier = if (isSelected) selectedModifier else baseModifier
-                    ) {
+                    Box(modifier = baseModifier) {
 
                         // Load the media item through the Glide entrypoint.
                         loadMedia(
@@ -448,16 +426,19 @@ private fun defaultBuildMediaItem(
                         )
 
                         // Scrim to separate the text and mimetypes from the image behind them.
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.2f),
-                            contentColor = Color.White,
-                        ) {
-                            MimeTypeOverlay(item)
-                        } // Scrim
+                        // CubeOS: only drawn when there is a badge to read, so plain photos keep
+                        // their true colours like on iOS.
+                        if (hasMimeTypeBadge(item)) {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.2f),
+                                contentColor = Color.White,
+                            ) {
+                                MimeTypeOverlay(item)
+                            } // Scrim
+                        }
                     }
 
-                    // This is outside the box that wraps the image so it doesn't get clipped
-                    // by the shape. Internally, it positions itself with similar padding.
+                    // The iOS selection circle in the bottom-end corner.
                     SelectedIconOverlay(isSelected, selectedPosition)
                 } // Surface
             } // Grid cell box
@@ -465,6 +446,16 @@ private fun defaultBuildMediaItem(
         else -> {}
     } // when
 }
+
+/** CubeOS: whether [MimeTypeOverlay] would draw anything for this item. */
+private fun hasMimeTypeBadge(item: MediaGridItem.MediaItem): Boolean =
+    item.media is Media.Video ||
+        when (item.media.standardMimeTypeExtension) {
+            _SPECIAL_FORMAT_GIF,
+            _SPECIAL_FORMAT_MOTION_PHOTO,
+            _SPECIAL_FORMAT_ANIMATED_WEBP -> true
+            else -> false
+        }
 
 /**
  * Generates a mimetype overlay for media items, if the mimetype is supported.
@@ -508,91 +499,87 @@ private fun MimeTypeOverlay(item: MediaGridItem.MediaItem) {
 /**
  * Generates a Icon that will show and hide itself based on the [isSelected] property.
  *
+ * CubeOS: an iOS selection circle in the bottom-end corner of the tile. Selected items show a
+ * filled accent circle with a white ring and a white check (or the selection order number); in
+ * multi-select, unselected items show an empty white ring. Everything is static drawing apart from
+ * the existing scale-in when an item becomes selected.
+ *
  * @param isSelected if the current item is currently selected by the user.
  * @param selectedIndex the index of the item in the selection set.
  */
 @Composable
 private fun SelectedIconOverlay(isSelected: Boolean, selectedIndex: Int) {
+    val configuration = LocalPhotopickerConfiguration.current
+    val accent =
+        CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
+            /* fallback */ MaterialTheme.colorScheme.primary
+        )
+    val onAccent =
+        CustomAccentColorScheme.current.getTextColorForAccentComponentsIfDefinedOrElse(
+            /* fallback */ MaterialTheme.colorScheme.onPrimary
+        )
 
     Box(modifier = Modifier.fillMaxSize().padding(MEASUREMENT_SELECTED_INTERNAL_PADDING)) {
+        // Empty ring for unselected items, only when more than one item can be picked.
+        if (!isSelected && configuration.selectionLimit > 1) {
+            Box(
+                modifier =
+                    Modifier.align(Alignment.BottomEnd)
+                        .size(MEASUREMENT_SELECTION_CIRCLE_SIZE)
+                        .background(Color.Black.copy(alpha = 0.12f), CircleShape)
+                        .border(MEASUREMENT_SELECTION_RING_WIDTH, Color.White, CircleShape)
+            )
+        }
+
         // Animate the visibility of the selected icon based on the [isSelected]
         // attribute.
         AnimatedVisibility(
-            modifier =
-                Modifier.align(AbsoluteAlignment.TopLeft)
-                    // This offset moves the icon in each axis from the corner
-                    // origin. (So that the center of the icon is closer to the
-                    // actual visual corner). The offset is applied to the animation
-                    // wrapper so the animation origin moves with the icon itself.
-                    .offset(
-                        x = -MEASUREMENT_SELECTED_ICON_OFFSET,
-                        y = -MEASUREMENT_SELECTED_ICON_OFFSET,
-                    ),
+            modifier = Modifier.align(Alignment.BottomEnd),
             visible = isSelected,
             enter = scaleIn(animationSpec = springDefaultEffectFloat),
             exit = scaleOut(animationSpec = emphasizedAccelerateFloat),
         ) {
-            val configuration = LocalPhotopickerConfiguration.current
-            when (configuration.pickImagesInOrder) {
-                true -> {
-                    val numberFormatter = remember { NumberFormat.getInstance() }
-                    var rememberedIndex by remember { mutableStateOf(selectedIndex) }
+            Box(
+                modifier =
+                    Modifier.size(MEASUREMENT_SELECTION_CIRCLE_SIZE)
+                        .background(accent, CircleShape)
+                        .border(MEASUREMENT_SELECTION_RING_WIDTH, Color.White, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (configuration.pickImagesInOrder) {
+                    true -> {
+                        val numberFormatter = remember { NumberFormat.getInstance() }
+                        var rememberedIndex by remember { mutableStateOf(selectedIndex) }
 
-                    LaunchedEffect(isSelected, selectedIndex) {
-                        if (isSelected) {
-                            rememberedIndex = selectedIndex
+                        LaunchedEffect(isSelected, selectedIndex) {
+                            if (isSelected) {
+                                rememberedIndex = selectedIndex
+                            }
                         }
+                        Text(
+                            // Since this is a 0-based index, increment it by 1 for displaying
+                            // to the user.
+                            text = numberFormatter.format(rememberedIndex + 1),
+                            textAlign = TextAlign.Center,
+                            style =
+                                LocalTextStyle.current.copy(
+                                    fontSize = MEASUREMENT_SELECTED_POSITION_FONT_SIZE,
+                                    fontWeight = FontWeight.SemiBold,
+                                ),
+                            color = onAccent,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
                     }
-                    Text(
-                        // Since this is a 0-based index, increment it by 1 for displaying
-                        // to the user.
-                        text = numberFormatter.format(rememberedIndex + 1),
-                        textAlign = TextAlign.Center,
-                        modifier =
-                            Modifier.circleBackground(
-                                color =
-                                    CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
-                                        /* fallback */ MaterialTheme.colorScheme.primary
-                                    ),
-                                padding = 1.dp,
-                                borderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                borderWidth = MEASUREMENT_SELECTED_ICON_BORDER,
-                            ),
-                        style =
-                            LocalTextStyle.current.copy(
-                                fontSize = MEASUREMENT_SELECTED_POSITION_FONT_SIZE
-                            ),
-                        color =
-                            CustomAccentColorScheme.current
-                                .getTextColorForAccentComponentsIfDefinedOrElse(
-                                    MaterialTheme.colorScheme.onPrimary
-                                ),
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
 
-                false ->
-                    Icon(
-                        ImageVector.vectorResource(R.drawable.photopicker_selected_media),
-                        modifier =
-                            Modifier
-                                // Background is necessary because the icon has negative
-                                // space.
-                                .background(MaterialTheme.colorScheme.onPrimary, CircleShape)
-                                // Border color should match the surface that is behind
-                                // the image.
-                                .border(
-                                    MEASUREMENT_SELECTED_ICON_BORDER,
-                                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    CircleShape,
-                                ),
-                        contentDescription = stringResource(R.string.photopicker_item_selected),
-                        tint =
-                            CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
-                                /* fallback */ MaterialTheme.colorScheme.primary
-                            ),
-                    )
+                    false ->
+                        Icon(
+                            Icons.Filled.Check,
+                            modifier = Modifier.size(MEASUREMENT_SELECTION_CHECK_SIZE),
+                            contentDescription = stringResource(R.string.photopicker_item_selected),
+                            tint = onAccent,
+                        )
+                }
             }
         } // Image + Icon Container
     }
@@ -653,12 +640,12 @@ private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGri
                 }
 
                 Spacer(Modifier.size(MEASUREMENT_DEFAULT_ALBUM_LABEL_SPACER_SIZE))
-                // Album title shown below the album thumbnail.
+                // Album title shown below the album thumbnail (CubeOS: iOS album caption).
                 Text(
                     text = item.album.displayName,
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
-                    style = MaterialTheme.typography.labelLarge,
+                    fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             } // Album cell column
@@ -675,7 +662,12 @@ private fun defaultBuildAlbumItem(item: MediaGridItem, onClick: ((item: MediaGri
 @Composable
 private fun defaultBuildSeparator(item: MediaGridItem.SeparatorItem) {
     Box(Modifier.padding(MEASUREMENT_SEPARATOR_PADDING).semantics(mergeDescendants = true) {}) {
-        Text(item.label, style = MaterialTheme.typography.titleSmall)
+        Text(
+            item.label,
+            fontSize = MEASUREMENT_SEPARATOR_FONT_SIZE,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

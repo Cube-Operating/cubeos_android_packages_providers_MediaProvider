@@ -17,6 +17,7 @@
 package com.android.photopicker.core.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -26,6 +27,7 @@ import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.platform.LocalContext
 import com.android.modules.utils.build.SdkLevel
@@ -56,12 +58,14 @@ fun PhotopickerTheme(
     val accentColorIsNotSpecified = remember { accentColorHelper.getAccentColor().isUnspecified }
 
     // Assemble Light & Dark themes, both color sets are needed to generate the [FixedAccentColors].
+    // CubeOS: the picker follows the system's iOS palette (accent blue, grouped greys) so that it
+    // looks like the iOS Photos picker in both light and dark mode. Only colours change here.
     val darkTheme = remember {
         when (accentColorIsNotSpecified) {
             true ->
                 if (SdkLevel.isAtLeastS()) dynamicDarkColorScheme(context) else darkColorScheme()
             false -> darkColorScheme()
-        }
+        }.toCubeIosColors(isDark = true)
     }
 
     val lightTheme = remember {
@@ -69,7 +73,7 @@ fun PhotopickerTheme(
             true ->
                 if (SdkLevel.isAtLeastS()) dynamicLightColorScheme(context) else lightColorScheme()
             false -> lightColorScheme()
-        }
+        }.toCubeIosColors(isDark = false)
     }
 
     // Choose which colorScheme to use based on if the device is in dark mode or not.
@@ -127,3 +131,74 @@ fun PhotopickerTheme(
         }
     }
 }
+
+/*
+ * CubeOS iOS palette. Values mirror the iOS system colours used across CubeOS:
+ * accent systemBlue, systemGroupedBackground / secondarySystemGroupedBackground, fills and
+ * secondary labels. Applied once per theme (remembered), so there is no per-frame cost.
+ */
+private val IOS_BLUE_DARK = Color(0xFF0A84FF)
+private val IOS_BLUE_LIGHT = Color(0xFF007AFF)
+
+private fun ColorScheme.toCubeIosColors(isDark: Boolean): ColorScheme =
+    if (isDark) {
+        copy(
+            primary = IOS_BLUE_DARK,
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFF0A3A6B),
+            onPrimaryContainer = Color.White,
+            secondary = IOS_BLUE_DARK,
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFF2C2C2E),
+            onSecondaryContainer = Color.White,
+            background = Color(0xFF000000),
+            onBackground = Color.White,
+            surface = Color(0xFF1C1C1E),
+            onSurface = Color.White,
+            // iOS secondaryLabel (#EBEBF5 at 60%) flattened on the dark sheet.
+            onSurfaceVariant = Color(0xFF98989F),
+            surfaceVariant = Color(0xFF2C2C2E),
+            surfaceTint = Color.Transparent,
+            surfaceDim = Color(0xFF000000),
+            // Selected segment of the segmented control.
+            surfaceBright = Color(0xFF636366),
+            surfaceContainerLowest = Color(0xFF000000),
+            surfaceContainerLow = Color(0xFF1C1C1E),
+            // The sheet itself.
+            surfaceContainer = Color(0xFF1C1C1E),
+            // Grouped cells / banners on the sheet.
+            surfaceContainerHigh = Color(0xFF2C2C2E),
+            // Segmented-control track and empty thumbnail placeholders (tertiarySystemFill).
+            surfaceContainerHighest = Color(0xFF323235),
+            outline = Color(0xFF545458),
+            outlineVariant = Color(0xFF38383A),
+        )
+    } else {
+        copy(
+            primary = IOS_BLUE_LIGHT,
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFFD6E8FF),
+            onPrimaryContainer = Color(0xFF00284F),
+            secondary = IOS_BLUE_LIGHT,
+            onSecondary = Color.White,
+            secondaryContainer = Color(0xFFE5E5EA),
+            onSecondaryContainer = Color.Black,
+            background = Color(0xFFF2F2F7),
+            onBackground = Color.Black,
+            surface = Color(0xFFFFFFFF),
+            onSurface = Color.Black,
+            // iOS secondaryLabel (#3C3C43 at 60%) flattened on white.
+            onSurfaceVariant = Color(0xFF8A8A8E),
+            surfaceVariant = Color(0xFFF2F2F7),
+            surfaceTint = Color.Transparent,
+            surfaceDim = Color(0xFFF2F2F7),
+            surfaceBright = Color(0xFFFFFFFF),
+            surfaceContainerLowest = Color(0xFFFFFFFF),
+            surfaceContainerLow = Color(0xFFF2F2F7),
+            surfaceContainer = Color(0xFFFFFFFF),
+            surfaceContainerHigh = Color(0xFFF2F2F7),
+            surfaceContainerHighest = Color(0xFFEEEEEF),
+            outline = Color(0xFFC6C6C8),
+            outlineVariant = Color(0xFFE5E5EA),
+        )
+    }

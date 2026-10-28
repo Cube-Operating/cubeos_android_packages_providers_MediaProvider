@@ -27,26 +27,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.photopicker.R
 import com.android.photopicker.core.animations.emphasizedAccelerate
@@ -62,38 +60,45 @@ import com.android.photopicker.core.features.Location
 import com.android.photopicker.core.features.LocationParams
 import com.android.photopicker.core.selection.LocalSelection
 import com.android.photopicker.core.theme.CustomAccentColorScheme
+import com.android.photopicker.features.navigationbar.isConfirmInTitleBar
 import com.android.photopicker.util.LocalLocalizationHelper
 import kotlinx.coroutines.launch
 
 /* The size of spacers between elements on the bar */
 private val MEASUREMENT_BUTTONS_SPACER_SIZE = 8.dp
-private val MEASUREMENT_DESELECT_SPACER_SIZE = 4.dp
 
-/* Corner radius of the selection bar */
-private val MEASUREMENT_SELECTION_BAR_CORNER_SIZE = 100
+/* CubeOS: iOS toolbar-style capsule */
+private val SELECTION_BAR_SHAPE = RoundedCornerShape(14.dp)
+private val BAR_TEXT_SIZE = 15.sp
 
 /* The amount of padding between elements and the edge of the selection bar */
-private val MEASUREMENT_BAR_PADDING = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+private val MEASUREMENT_BAR_PADDING = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
 
 /**
  * The Photopicker selection bar that shows the actions related to the current selection of Media.
  * This composable does not provide a secondary action button directly, but instead exposes
  * [Location.SELECTION_BAR_SECONDARY_ACTION] for another feature to provide a secondary action that
  * is relevant to the selection bar. If not are provided, the space will be left empty.
+ *
+ * CubeOS: styled as an iOS toolbar. In the full screen picker the confirm action lives in the title
+ * bar ("Add"), see [isConfirmInTitleBar]; otherwise the Done button stays here.
  */
 @Composable
 fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
     // Collect selection to ensure this is recomposed when the selection is updated.
     val selection = LocalSelection.current
     val currentSelection by LocalSelection.current.flow.collectAsStateWithLifecycle()
+    val confirmInTitleBar = isConfirmInTitleBar()
 
     // For ACTION_USER_SELECT_IMAGES_FOR_APP selection bar should always be visible to allow users
-    // the option to exit with zero selection i.e. revoking all grants.
+    // the option to exit with zero selection i.e. revoking all grants. When that confirm action is
+    // already in the title bar there is nothing left to show for an empty selection.
     val showSelectionBar =
         currentSelection.isNotEmpty() ||
-            MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
-                LocalPhotopickerConfiguration.current.action
-            )
+            (!confirmInTitleBar &&
+                MediaStore.ACTION_USER_SELECT_IMAGES_FOR_APP.equals(
+                    LocalPhotopickerConfiguration.current.action
+                ))
     val configuration = LocalPhotopickerConfiguration.current
     val events = LocalEvents.current
     val scope = rememberCoroutineScope()
@@ -111,8 +116,8 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            shape = RoundedCornerShape(CornerSize(MEASUREMENT_SELECTION_BAR_CORNER_SIZE)),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = SELECTION_BAR_SHAPE,
             shadowElevation = ElevationTokens.Level2,
         ) {
             Row(
@@ -122,28 +127,12 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
             ) {
 
                 // Deselect all button [Left side]
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { scope.launch { selection.clear() } }) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription =
-                                stringResource(
-                                    R.string.photopicker_clear_selection_button_description
-                                ),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Spacer(Modifier.size(MEASUREMENT_DESELECT_SPACER_SIZE))
-                    val selectionSizeDescription =
-                        stringResource(
-                            R.string.photopicker_selection_size_description,
-                            localizedCurrentSelectionSize,
-                        )
+                TextButton(onClick = { scope.launch { selection.clear() } }) {
                     Text(
-                        "$localizedCurrentSelectionSize",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier =
-                            Modifier.semantics { contentDescription = selectionSizeDescription },
+                        stringResource(R.string.photopicker_clear_selection_button_description),
+                        fontSize = BAR_TEXT_SIZE,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
                     )
                 }
 
@@ -154,39 +143,58 @@ fun SelectionBar(modifier: Modifier = Modifier, params: LocationParams) {
                         maxSlots = 1, // Only accept one additional action.
                         modifier = Modifier,
                     )
-                    Spacer(Modifier.size(MEASUREMENT_BUTTONS_SPACER_SIZE))
-                    FilledTonalButton(
-                        onClick = {
-                            // Log clicking the picker Add media button
-                            scope.launch {
-                                events.dispatch(
-                                    Event.LogPhotopickerUIEvent(
-                                        FeatureToken.SELECTION_BAR.token,
-                                        configuration.sessionId,
-                                        configuration.callingPackageUid ?: -1,
-                                        Telemetry.UiEvent.PICKER_CLICK_ADD_BUTTON,
+                    if (!confirmInTitleBar) {
+                        Spacer(Modifier.size(MEASUREMENT_BUTTONS_SPACER_SIZE))
+                        val selectionSizeDescription =
+                            stringResource(
+                                R.string.photopicker_selection_size_description,
+                                localizedCurrentSelectionSize,
+                            )
+                        Button(
+                            onClick = {
+                                // Log clicking the picker Add media button
+                                scope.launch {
+                                    events.dispatch(
+                                        Event.LogPhotopickerUIEvent(
+                                            FeatureToken.SELECTION_BAR.token,
+                                            configuration.sessionId,
+                                            configuration.callingPackageUid ?: -1,
+                                            Telemetry.UiEvent.PICKER_CLICK_ADD_BUTTON,
+                                        )
                                     )
-                                )
-                            }
-                            // The selection bar should receive a click handler from its parent
-                            // to handle the primary button click.
-                            val clickAction = params as? LocationParams.WithClickAction
-                            clickAction?.onClick()
-                        },
-                        colors =
-                            ButtonDefaults.filledTonalButtonColors(
-                                containerColor =
-                                    CustomAccentColorScheme.current.getAccentColorIfDefinedOrElse(
-                                        /* fallback */ MaterialTheme.colorScheme.primary
-                                    ),
-                                contentColor =
-                                    CustomAccentColorScheme.current
-                                        .getTextColorForAccentComponentsIfDefinedOrElse(
-                                            /* fallback */ MaterialTheme.colorScheme.onPrimary
-                                        ),
-                            ),
-                    ) {
-                        Text(stringResource(R.string.photopicker_done_button_label))
+                                }
+                                // The selection bar should receive a click handler from its parent
+                                // to handle the primary button click.
+                                val clickAction = params as? LocationParams.WithClickAction
+                                clickAction?.onClick()
+                            },
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor =
+                                        CustomAccentColorScheme.current
+                                            .getAccentColorIfDefinedOrElse(
+                                                /* fallback */ MaterialTheme.colorScheme.primary
+                                            ),
+                                    contentColor =
+                                        CustomAccentColorScheme.current
+                                            .getTextColorForAccentComponentsIfDefinedOrElse(
+                                                /* fallback */ MaterialTheme.colorScheme.onPrimary
+                                            ),
+                                ),
+                            modifier =
+                                Modifier.semantics {
+                                    stateDescription = selectionSizeDescription
+                                },
+                        ) {
+                            val label = stringResource(R.string.photopicker_done_button_label)
+                            Text(
+                                if (currentSelection.isEmpty()) label
+                                else "$label ($localizedCurrentSelectionSize)",
+                                fontSize = BAR_TEXT_SIZE,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }

@@ -21,11 +21,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.android.photopicker.R
 import com.android.photopicker.core.configuration.LocalPhotopickerConfiguration
 import com.android.photopicker.core.events.Event
@@ -138,124 +146,131 @@ fun Banner(
     val config = LocalPhotopickerConfiguration.current
     val events = LocalEvents.current
 
-    Card(
-        // Consume the incoming modifier for positioning the banner.
-        modifier = modifier,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-        shape = MaterialTheme.shapes.large,
-    ) {
-        Column(Modifier.padding(MEASUREMENT_BANNER_CARD_INTERNAL_PADDING)) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(MEASUREMENT_BANNER_ICON_GAP_SIZE),
-            ) {
-                // Not all Banners provide an Icon
-                banner.getIcon()?.let {
-                    Icon(
-                        it,
-                        contentDescription = banner.iconContentDescription(),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier =
-                            Modifier.size(MEASUREMENT_BANNER_ICON_SIZE)
-                                .padding(MEASUREMENT_BANNER_ICON_PADDING)
-                    )
-                }
-
-                // Stack the title and message vertically in the same horizontal container
-                // weight(1f) is used to ensure that the other siblings in this row are displayed,
-                // and this column will fill any remaining space.
-                Column(
-                    modifier =
-                        Modifier.padding(PaddingValues(end = MEASUREMENT_BANNER_TEXT_END_PADDING))
-                            .weight(1f)
+    // CubeOS: the privacy note is shown like iOS does it — a small secondary footnote, not a card.
+    if (banner.declaration == BannerDefinitions.PRIVACY_EXPLAINER) {
+        PrivacyFootnote(banner, modifier, onDismiss)
+    } else {
+        Card(
+            // Consume the incoming modifier for positioning the banner.
+            modifier = modifier,
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+            // CubeOS: iOS grouped cell corner radius.
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Column(Modifier.padding(MEASUREMENT_BANNER_CARD_INTERNAL_PADDING)) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(MEASUREMENT_BANNER_ICON_GAP_SIZE),
                 ) {
-                    if (banner.buildTitle().isNotEmpty()) {
-                        Text(
-                            text = banner.buildTitle(),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
+                    // Not all Banners provide an Icon
+                    banner.getIcon()?.let {
+                        Icon(
+                            it,
+                            contentDescription = banner.iconContentDescription(),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier =
-                                Modifier.align(Alignment.Start)
-                                    .padding(bottom = MEASUREMENT_BANNER_TITLE_BOTTOM_SPACING)
+                                Modifier.size(MEASUREMENT_BANNER_ICON_SIZE)
+                                    .padding(MEASUREMENT_BANNER_ICON_PADDING)
                         )
                     }
-                    Text(
-                        text = banner.buildMessage(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.align(Alignment.Start),
-                    )
-                }
-            }
 
-            // The action Row, which sometimes may be empty if the banner is not dismissable and
-            // does not provide its own Action
-            if (banner.declaration.dismissable || banner.actionLabel() != null) {
-                val scope = rememberCoroutineScope()
-
-                Row(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(MEASUREMENT_BANNER_BUTTON_ROW_SPACING),
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-
-                    // It's possible that a Banner provides an onAction implementation, but does not
-                    // provide an actionLabel() implementation. Since the banner has no idea what
-                    // the action might do, there's no way to guess at a label, so only show the
-                    // additional action button when the label has been set.
-                    banner.actionLabel()?.let {
-                        val context = LocalContext.current
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    events.dispatch(
-                                        Event.LogPhotopickerBannerInteraction(
-                                            dispatcherToken = CORE.token,
-                                            sessionId = config.sessionId,
-                                            bannerType =
-                                                BannerType.fromBannerDeclaration(
-                                                    banner.declaration
-                                                ),
-                                            userInteraction =
-                                                UserBannerInteraction.CLICK_BANNER_ACTION_BUTTON
-                                        )
-                                    )
-                                }
-                                banner.onAction(context)
-                            },
-                        ) {
-                            Text(it)
+                    // Stack the title and message vertically in the same horizontal container
+                    // weight(1f) is used to ensure that the other siblings in this row are displayed,
+                    // and this column will fill any remaining space.
+                    Column(
+                        modifier =
+                            Modifier.padding(PaddingValues(end = MEASUREMENT_BANNER_TEXT_END_PADDING))
+                                .weight(1f)
+                    ) {
+                        if (banner.buildTitle().isNotEmpty()) {
+                            Text(
+                                text = banner.buildTitle(),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier =
+                                    Modifier.align(Alignment.Start)
+                                        .padding(bottom = MEASUREMENT_BANNER_TITLE_BOTTOM_SPACING)
+                            )
                         }
+                        Text(
+                            text = banner.buildMessage(),
+                            fontSize = 13.sp,
+                            modifier = Modifier.align(Alignment.Start),
+                        )
                     }
+                }
 
-                    // If the banner can be dismissed per the [BannerDeclaration], then the dismiss
-                    // button needs to be shown to the user. What happens when the dismiss button is
-                    // clicked is up to the caller. A core string is used here to ensure consistency
-                    // between banners.
-                    if (banner.declaration.dismissable) {
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    events.dispatch(
-                                        Event.LogPhotopickerBannerInteraction(
-                                            dispatcherToken = CORE.token,
-                                            sessionId = config.sessionId,
-                                            bannerType =
-                                                BannerType.fromBannerDeclaration(
-                                                    banner.declaration
-                                                ),
-                                            userInteraction =
-                                                UserBannerInteraction.CLICK_BANNER_DISMISS_BUTTON
+                // The action Row, which sometimes may be empty if the banner is not dismissable and
+                // does not provide its own Action
+                if (banner.declaration.dismissable || banner.actionLabel() != null) {
+                    val scope = rememberCoroutineScope()
+
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(MEASUREMENT_BANNER_BUTTON_ROW_SPACING),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+
+                        // It's possible that a Banner provides an onAction implementation, but does not
+                        // provide an actionLabel() implementation. Since the banner has no idea what
+                        // the action might do, there's no way to guess at a label, so only show the
+                        // additional action button when the label has been set.
+                        banner.actionLabel()?.let {
+                            val context = LocalContext.current
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        events.dispatch(
+                                            Event.LogPhotopickerBannerInteraction(
+                                                dispatcherToken = CORE.token,
+                                                sessionId = config.sessionId,
+                                                bannerType =
+                                                    BannerType.fromBannerDeclaration(
+                                                        banner.declaration
+                                                    ),
+                                                userInteraction =
+                                                    UserBannerInteraction.CLICK_BANNER_ACTION_BUTTON
+                                            )
                                         )
-                                    )
-                                }
-                                onDismiss()
+                                    }
+                                    banner.onAction(context)
+                                },
+                            ) {
+                                Text(it)
                             }
-                        ) {
-                            Text(stringResource(R.string.photopicker_dismiss_banner_button_label))
+                        }
+
+                        // If the banner can be dismissed per the [BannerDeclaration], then the dismiss
+                        // button needs to be shown to the user. What happens when the dismiss button is
+                        // clicked is up to the caller. A core string is used here to ensure consistency
+                        // between banners.
+                        if (banner.declaration.dismissable) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        events.dispatch(
+                                            Event.LogPhotopickerBannerInteraction(
+                                                dispatcherToken = CORE.token,
+                                                sessionId = config.sessionId,
+                                                bannerType =
+                                                    BannerType.fromBannerDeclaration(
+                                                        banner.declaration
+                                                    ),
+                                                userInteraction =
+                                                    UserBannerInteraction.CLICK_BANNER_DISMISS_BUTTON
+                                            )
+                                        )
+                                    }
+                                    onDismiss()
+                                }
+                            ) {
+                                Text(stringResource(R.string.photopicker_dismiss_banner_button_label))
+                            }
                         }
                     }
                 }
@@ -274,5 +289,55 @@ fun Banner(
                 userInteraction = UserBannerInteraction.UNSET_BANNER_INTERACTION
             )
         )
+    }
+}
+
+/**
+ * CubeOS: the privacy explainer as an iOS-style footnote — small secondary text with an optional
+ * small dismiss glyph. Same dismiss behaviour and telemetry as the card's Dismiss button.
+ */
+@Composable
+private fun PrivacyFootnote(banner: Banner, modifier: Modifier, onDismiss: () -> Unit) {
+    val config = LocalPhotopickerConfiguration.current
+    val events = LocalEvents.current
+    val scope = rememberCoroutineScope()
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = banner.buildMessage(),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
+        if (banner.declaration.dismissable) {
+            IconButton(
+                modifier = Modifier.size(32.dp),
+                onClick = {
+                    scope.launch {
+                        events.dispatch(
+                            Event.LogPhotopickerBannerInteraction(
+                                dispatcherToken = CORE.token,
+                                sessionId = config.sessionId,
+                                bannerType = BannerType.fromBannerDeclaration(banner.declaration),
+                                userInteraction = UserBannerInteraction.CLICK_BANNER_DISMISS_BUTTON
+                            )
+                        )
+                    }
+                    onDismiss()
+                },
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription =
+                        stringResource(R.string.photopicker_dismiss_banner_button_label),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }
