@@ -59,7 +59,8 @@ class PhotopickerDeviceConfigReceiver : BroadcastReceiver() {
             deviceConfig.getFlag(
                 namespace = NAMESPACE_MEDIAPROVIDER,
                 key = "enable_modern_picker",
-                defaultValue = false
+                // CubeOS: on by default (see MediaProvider ConfigStore).
+                defaultValue = true
             )
 
         val packageName = MainActivity::class.java.getPackage()?.getName()

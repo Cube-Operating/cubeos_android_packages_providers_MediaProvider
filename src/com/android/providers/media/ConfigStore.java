@@ -63,7 +63,9 @@ public interface ConfigStore {
     boolean DEFAULT_TRANSCODE_OPT_OUT_STRATEGY_ENABLED = false;
     int DEFAULT_TRANSCODE_MAX_DURATION = 60 * 1000; // 1 minute
 
-    boolean DEFAULT_MODERN_PICKER_ENABLED = false;
+    // CubeOS: the modern photo picker (com.android.photopicker, restyled in the iOS style) is on by
+    // default; Google turns it on by server config, which CubeOS doesn't receive.
+    boolean DEFAULT_MODERN_PICKER_ENABLED = true;
 
     boolean DEFAULT_PICKER_GET_CONTENT_PRELOAD = true;
     boolean DEFAULT_PICKER_PICK_IMAGES_PRELOAD = true;

@@ -52,7 +52,7 @@
 
     <activity
       android:name="com.android.photopicker.MainActivity"
-      android:enabled="false"
+      android:enabled="true"
       android:exported="true"
       android:theme="@style/Theme.Photopicker"
       android:label="@string/photopicker_application_label"
@@ -91,7 +91,7 @@
         android:targetActivity="com.android.photopicker.MainActivity"
         android:permission="android.permission.GRANT_RUNTIME_PERMISSIONS"
         android:exported="true"
-        android:enabled="false"
+        android:enabled="true"
         android:excludeFromRecents="true">
         <intent-filter android:priority="105">
             <action android:name="android.provider.action.USER_SELECT_IMAGES_FOR_APP" />
